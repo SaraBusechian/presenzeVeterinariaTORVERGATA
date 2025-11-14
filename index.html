@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Presenze (Cloud Sync)</title>
+    <!-- Caricamento di Tailwind CSS per lo stile -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ... (gli stili sono invariati) ... */
+        body { font-family: "Inter", sans-serif; }
+        .student-item { -webkit-tap-highlight-color: transparent; transition: all 0.15s ease-in-out; }
+        .student-item.present { @apply bg-green-100 border-green-400 text-green-800 font-semibold shadow-inner; }
+        dialog::backdrop { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        #connectionStatus { transition: all 0.5s ease; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="container max-w-4xl mx-auto p-4 sm:p-6 md:p-8">
+        
+        <!-- Intestazione -->
+        <header class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800 mb-2">Registro Presenze</h1>
+                    <p class="text-gray-600">Corso di Laurea in Medicina Veterinaria - Tor Vergata</p>
+                    <p class="text-sm text-gray-500 mt-2">I dati sono sincronizzati in tempo reale tra tutti i dispositivi.</p>
+                </div>
+                <!-- Indicatore di Stato Connessione -->
+                <div id="connectionStatus" class="flex items-center gap-2 bg-gray-100 text-gray-500 text-sm py-1 px-3 rounded-full">
+                    <div id="statusDot" class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                    <span id="statusText">Connessione...</span>
+                </div>
+            </div>
+
+            <!-- Nuovi campi per info uscita. LA DATA ORA E' IL SELETTORE. -->
+            <div class="mt-6 border-t pt-4 space-y-3">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="inputDate" class="block text-sm font-medium text-gray-700">Data Uscita (seleziona per caricare/creare):</label>
+                        <input type="date" id="inputDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="inputSubject" class="block text-sm font-medium text-gray-700">Insegnamento:</label>
+                        <input type="text" id="inputSubject" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                </div>
+                <div>
+                    <label for="inputOutingType" class="block text-sm font-medium text-gray-700">Tipo di Uscita:</label>
+                    <input type="text" id="inputOutingType" placeholder="Es. Visita azienda X" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+        </header>
+
+        <!-- Pannello di Controllo -->
+        <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+            <!-- Barra di Ricerca -->
+            <input type="search" id="searchBar" placeholder="Cerca uno studente..." class="w-full p-3 border border-gray-300 rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            
+            <!-- Contatore -->
+            <div id="counter" class="text-lg font-semibold my-4 text-center text-gray-700">
+                Presenti: 0 / 16
+            </div>
+
+            <!-- Pulsanti di Azione -->
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button id="exportButton" class="w-full sm:w-1/2 bg-blue-600 text-white py-3 px-4 rounded-lg shadow font-semibold hover:bg-blue-700 transition duration-200">
+                    Esporta Lista
+                </button>
+                <button id="resetButton" class="w-full sm:w-1/2 bg-red-600 text-white py-3 px-4 rounded-lg shadow font-semibold hover:bg-red-700 transition duration-200">
+                    Azzera Lista
+                </button>
+            </div>
+        </div>
+
+        <!-- Lista Studenti -->
+        <main>
+            <div id="studentList" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <!-- Gli studenti verranno caricati qui da JavaScript -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modale per Esportazione / Conferma Reset -->
+    <dialog id="modal" class="p-0 rounded-lg shadow-xl max-w-lg w-11/12">
+        <div class="p-6">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
+            
+            <!-- Contenuto per Esportazione -->
+            <div id="exportContent">
+                <p class="text-sm text-gray-600 mb-3">Copia e incolla questo testo in un'email, note o documento.</p>
+                <textarea id="exportTextArea" readonly class="w-full h-48 p-3 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"></textarea>
+                <button id="copyButton" class="mt-3 w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700">Copia Testo</button>
+            </div>
+            
+            <!-- Contenuto per Reset -->
+            <div id="resetContent" class="hidden">
+                <p class="text-gray-700">Sei sicuro di voler azzerare l'elenco? Tutti i presenti verranno segnati come assenti. Questa azione è pensata per iniziare una nuova uscita didattica.</p>
+                <button id="confirmResetButton" class="mt-4 w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700">Sì, Azzera Lista</button>
+            </div>
+        </div>
+        
+        <!-- Pulsante di Chiusura Modale -->
+        <footer class="bg-gray-100 p-4 text-right">
+            <button id="closeModalButton" class="bg-gray-200 text-gray-800 py-2 px-5 rounded-lg hover:bg-gray-300">Chiudi</button>
+        </footer>
+    </dialog>
+
+
+    <!-- Script per Firebase -->
+    <script type="module">
+        // Importa le funzioni necessarie dai moduli Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURAZIONE FIREBASE (DA INSERIRE) ---
+        // 1. Vai su console.firebase.google.com, crea un progetto.
+        // 2. Aggiungi un'app Web (icona </>).
+        // 3. Copia l'oggetto 'firebaseConfig' che ti viene fornito e incollalo qui sotto.
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyAYgvLPFt9ZtfvnnwSebotXMbazOb-BcUs",
+            authDomain: "presenze-pratiche-incampo-vet.firebaseapp.com",
+            projectId: "presenze-pratiche-incampo-vet",
+            storageBucket: "presenze-pratiche-incampo-vet.firebasestorage.app",
+            messagingSenderId: "30237331152",
+            appId: "1:30237331152:web:57d036de59d78108c198d5"
+        };
+        
+        // --- CONFIGURAZIONE STUDENTI ---
+        const students = [
+            { id: 's1', name: 'Mario Rossi' },
+            { id: 's2', name: 'Laura Bianchi' },
+            { id: 's3', name: 'Giuseppe Verdi' },
+            { id: 's4', name: 'Anna Neri' },
+            { id: 's5', name: 'Luca Gialli' },
+            { id: 's6', name: 'Chiara Bruno' },
+            { id: 's7', name: 'Paolo Russo' },
+            { id: 's8', name: 'Sara Ferrari' },
+            { id: 's9', name: 'Matteo Romano' },
+            { id: 's10', name: 'Elena Greco' },
+            { id: 's11', name: 'Davide Galli' },
+            { id: 's12', name: 'Sofia Conti' },
+            { id: 's13', name: 'Lorenzo Serra' },
+            { id: 's14', name: 'Giulia Esposito' },
+            { id: 's15', name: 'Andrea Moretti' },
+            { id: 's16', name: 'Francesca Barbieri' }
+        ];
+
+        // --- Variabili Globali ---
+        let db; 
+        let currentOutingDocRef; // Riferimento dinamico al documento dell'uscita
+        let currentOutingListenerUnsubscribe = null; // Funzione per staccare il listener
+        let presentState = {}; // Stato delle presenze per l'uscita caricata
+
+        // --- Elementi del DOM ---
+        const studentList = document.getElementById('studentList');
+        const searchBar = document.getElementById('searchBar');
+        const counter = document.getElementById('counter');
+        const exportButton = document.getElementById('exportButton');
+        const resetButton = document.getElementById('resetButton');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        
+        // Elementi per metadata
+        const inputSubject = document.getElementById('inputSubject');
+        const inputDate = document.getElementById('inputDate');
+        const inputOutingType = document.getElementById('inputOutingType');
+        
+        // Elementi del Modale
+        const modal = document.getElementById('modal');
+        const modalTitle = document.getElementById('modalTitle');
+        const exportContent = document.getElementById('exportContent');
+        const exportTextArea = document.getElementById('exportTextArea');
+        const copyButton = document.getElementById('copyButton');
+        const resetContent = document.getElementById('resetContent');
+        const confirmResetButton = document.getElementById('confirmResetButton');
+        const closeModalButton = document.getElementById('closeModalButton');
+
+        // --- Funzioni Principali ---
+
+        /**
+         * Aggiorna l'interfaccia utente (lista e contatore) in base allo stato
+         */
+        function renderUI(filter = '') {
+            studentList.innerHTML = ''; 
+            const normalizedFilter = filter.trim().toLowerCase();
+            
+            students
+                .filter(student => student.name.toLowerCase().includes(normalizedFilter))
+                .forEach(student => {
+                    const isPresent = presentState[student.id] === true;
+
+                    const item = document.createElement('div');
+                    item.textContent = student.name;
+                    item.dataset.id = student.id;
+                    item.className = 'student-item p-4 border border-gray-300 bg-white rounded-lg text-center cursor-pointer select-none shadow-sm hover:shadow-md';
+                    
+                    if (isPresent) {
+                        item.classList.add('present');
+                    }
+
+                    item.addEventListener('click', togglePresence);
+                    studentList.appendChild(item);
+                });
+            
+            const totalPresent = Object.values(presentState).filter(v => v === true).length;
+            counter.textContent = `Presenti: ${totalPresent} / ${students.length}`;
+        }
+        
+        /**
+         * Carica i dati dell'uscita (info e presenze) in base alla data.
+         * Stacca il listener precedente e ne attacca uno nuovo.
+         * @param {string} dateString - La data nel formato YYYY-MM-DD.
+         */
+        function loadOutingData(dateString) {
+            if (!dateString) return; // Non fare nulla se la data è vuota
+
+            // 1. Stacca il listener precedente, se esiste
+            if (currentOutingListenerUnsubscribe) {
+                currentOutingListenerUnsubscribe();
+            }
+
+            // 2. Definisci il percorso per la nuova data
+            // IMPORTANTE: Nuova collezione 'zootecnia_outings'
+            const collectionPath = 'zootecnia_outings'; 
+            const docId = dateString;
+            currentOutingDocRef = doc(db, collectionPath, docId);
+
+            // 3. Attacca il nuovo listener
+            currentOutingListenerUnsubscribe = onSnapshot(currentOutingDocRef, (doc) => {
+                statusDot.classList.remove('bg-yellow-400', 'animate-pulse');
+                statusDot.classList.add('bg-green-500');
+                statusText.textContent = 'Sincronizzato';
+                connectionStatus.classList.remove('bg-gray-100', 'text-gray-500');
+                connectionStatus.classList.add('bg-green-100', 'text-green-700');
+
+                if (doc.exists()) {
+                    // Documento trovato (uscita vecchia o in corso)
+                    const data = doc.data();
+                    presentState = data.attendance || {}; // Carica le presenze
+                    // Carica i metadata, ma non sovrascrivere se l'utente sta scrivendo
+                    if (document.activeElement !== inputSubject) {
+                        inputSubject.value = data.subject || '';
+                    }
+                    if (document.activeElement !== inputOutingType) {
+                        inputOutingType.value = data.outingType || '';
+                    }
+                } else {
+                    // Nessun documento per questa data = Nuova Uscita
+                    console.log(`Nessun documento per ${docId}, si crea una nuova lista.`);
+                    presentState = {};
+                    inputSubject.value = '';
+                    inputOutingType.value = '';
+                    // Salva la data per "creare" il documento
+                    handleMetadataSave();
+                }
+                
+                renderUI(searchBar.value);
+                
+            }, (error) => {
+                console.error("Errore listener Firestore:", error);
+                statusDot.classList.remove('bg-yellow-400', 'animate-pulse');
+                statusDot.classList.add('bg-red-500');
+                statusText.textContent = 'Errore';
+                connectionStatus.classList.remove('bg-gray-100', 'text-gray-500');
+                connectionStatus.classList.add('bg-red-100', 'text-red-700');
+            });
+        }
+
+        /**
+         * Gestore evento per il click sul nome dello studente.
+         */
+        async function togglePresence(event) {
+            const item = event.currentTarget;
+            const id = item.dataset.id;
+            const isCurrentlyPresent = presentState[id] === true;
+            const newPresence = !isCurrentlyPresent;
+
+            item.classList.toggle('present', newPresence);
+
+            try {
+                // Salva solo il campo dello studente nella mappa 'attendance'
+                // Questo usa la notazione "dot" di Firestore per aggiornare un campo nidificato
+                await setDoc(currentOutingDocRef, { 
+                    attendance: { [id]: newPresence } 
+                }, { merge: true });
+            } catch (e) {
+                console.error("Errore nell'aggiornamento della presenza:", e);
+            }
+        }
+
+        /**
+         * Salva le modifiche ai campi info (Insegnamento, Tipo) su Firebase
+         */
+        async function handleMetadataSave() {
+            if (!currentOutingDocRef) return;
+
+            const dataToSave = {
+                subject: inputSubject.value,
+                date: inputDate.value, // Salva anche la data per coerenza
+                outingType: inputOutingType.value
+            };
+            
+            try {
+                // Usiamo merge:true per non sovrascrivere la mappa 'attendance'
+                await setDoc(currentOutingDocRef, dataToSave, { merge: true });
+                console.log("Metadata salvato.");
+            } catch (e) {
+                console.error("Errore salvataggio metadata:", e);
+            }
+        }
+
+
+        // --- Gestori Eventi Pulsanti ---
+
+        searchBar.addEventListener('input', (e) => {
+            renderUI(e.target.value);
+        });
+
+        closeModalButton.addEventListener('click', () => modal.close());
+
+        resetButton.addEventListener('click', () => {
+            modalTitle.textContent = 'Azzera Lista Presenze';
+            exportContent.classList.add('hidden');
+            resetContent.classList.remove('hidden');
+            modal.showModal();
+        });
+        
+        confirmResetButton.addEventListener('click', async () => {
+            const resetAttendance = {};
+            for (const student of students) {
+                resetAttendance[student.id] = false;
+            }
+            try {
+                // Sovrascrive solo la mappa 'attendance' nel documento attuale
+                await setDoc(currentOutingDocRef, { attendance: resetAttendance }, { merge: true });
+                console.log("Lista presenze azzerata per il giorno corrente.");
+            } catch (e) {
+                console.error("Errore durante l'azzeramento:", e);
+            }
+            modal.close();
+        });
+
+        exportButton.addEventListener('click', () => {
+            let presenti = [];
+            let assenti = [];
+
+            for (const student of students) {
+                if (presentState[student.id] === true) {
+                    presenti.push(`- ${student.name}`);
+                } else {
+                    assenti.push(`- ${student.name}`);
+                }
+            }
+
+            const subject = inputSubject.value || '(Insegnamento non specificato)';
+            const date = inputDate.value || '(Data non specificata)';
+            const outingType = inputOutingType.value || '(Tipo uscita non specificato)';
+
+            let output = `--- REPORT PRESENZE ---\n`;
+            output += `Insegnamento: ${subject}\n`;
+            output += `Data: ${date}\n`;
+            output += `Tipo Uscita: ${outingType}\n\n`;
+            output += `PRESENTI (${presenti.length}):\n`;
+            output += presenti.length > 0 ? presenti.join('\n') : '(Nessuno)\n';
+            output += `\nASSENTI (${assenti.length}):\n`;
+            output += assenti.length > 0 ? assenti.join('\n') : '(Nessuno)\n';
+            
+            exportTextArea.value = output;
+            modalTitle.textContent = 'Esporta Lista Presenze';
+            exportContent.classList.remove('hidden');
+            resetContent.classList.add('hidden');
+            modal.showModal();
+        });
+
+        copyButton.addEventListener('click', () => {
+            exportTextArea.select();
+            try {
+                document.execCommand('copy');
+                copyButton.textContent = 'Copiato!';
+                setTimeout(() => { copyButton.textContent = 'Copia Testo'; }, 2000);
+            } catch (err) {
+                copyButton.textContent = 'Errore... Copia manualmente.';
+            }
+        });
+
+        // --- Avvio Applicazione ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (firebaseConfig.apiKey === "INCOLLA_QUI_LA_TUA_API_KEY") {
+                console.error("Configurazione Firebase mancante! Inseriscila nel file.");
+                statusText.textContent = 'Config. Mancante';
+                statusDot.classList.add('bg-red-500');
+                return;
+            }
+
+            try {
+                // 1. Inizializza Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                const auth = getAuth(app);
+
+                // 2. Autenticazione anonima (semplice e trasparente)
+                await signInAnonymously(auth);
+                console.log("Autenticazione anonima riuscita.");
+
+                // 3. Imposta la data a oggi e carica i dati
+                // Formato YYYY-MM-DD
+                const today = new Date().toISOString().split('T')[0];
+                inputDate.value = today;
+                loadOutingData(today);
+                
+                // 4. Listener per i cambi
+                
+                // Quando CAMBIA LA DATA, carica la lista di quel giorno
+                inputDate.addEventListener('change', () => {
+                    loadOutingData(inputDate.value);
+                });
+
+                // Quando cambia gli altri campi, salva i metadata
+                // 'change' si attiva quando l'utente lascia il campo
+                inputSubject.addEventListener('change', handleMetadataSave);
+                inputOutingType.addEventListener('change', handleMetadataSave);
+
+            } catch (e) {
+                console.error("Errore inizializzazione Firebase:", e);
+                statusDot.classList.remove('bg-yellow-400', 'animate-pulse');
+                statusDot.classList.add('bg-red-500');
+                
+                // Errore specifico se l'auth anonima non è abilitata
+                if (e.code === 'auth/configuration-not-found') {
+                    statusText.textContent = 'Errore Auth: Abilita "Accesso anonimo" in Firebase.';
+                } else {
+                    statusText.textContent = 'Errore Init.';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
