@@ -129,7 +129,7 @@
             <!-- Pulsanti di Azione -->
             <div class="flex flex-col sm:flex-row gap-3">
                 <button id="exportButton" class="w-full sm:w-1/2 bg-blue-600 text-white py-3 px-4 rounded-lg shadow font-semibold hover:bg-blue-700 transition duration-200">
-                    Esporta Lista
+                    Esporta / Condividi
                 </button>
                 <button id="resetButton" class="w-full sm:w-1/2 bg-red-600 text-white py-3 px-4 rounded-lg shadow font-semibold hover:bg-red-700 transition duration-200">
                     Azzera Lista
@@ -145,12 +145,12 @@
         </main>
     </div>
 
-    <!-- Modale per Esportazione / Conferma Reset -->
+    <!-- Modale per Esportazione (Fallback per Desktop) / Conferma Reset -->
     <dialog id="modal" class="p-0 rounded-lg shadow-xl max-w-lg w-11/12">
         <div class="p-6">
             <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
             
-            <!-- Contenuto per Esportazione -->
+            <!-- Contenuto per Esportazione (Fallback) -->
             <div id="exportContent">
                 <p class="text-sm text-gray-600 mb-3">Copia e incolla questo testo in un'email, note o documento.</p>
                 <textarea id="exportTextArea" readonly class="w-full h-48 p-3 border border-gray-300 rounded-lg bg-gray-50 font-mono text-sm"></textarea>
@@ -181,7 +181,7 @@
         // --- CONFIGURAZIONE ---
         
         // Questa è la lista fittizia. Sostituiscila con quella reale.
-        // Assicurati che ogni studente abbia un 'id' unico (es. 's1', 's2', ...).
+        // Assicurati che ogni studente abbia un 'id' unico (es. 's1', 's2', ... o meglio ancora la matricola).
         const students = [
             { id: 's1', name: 'Mario Rossi' },
             { id: 's2', name: 'Laura Bianchi' },
@@ -202,7 +202,7 @@
         ];
 
         // --- CONFIGURAZIONE FIREBASE ---
-        // Configurazione Firebase (sostituita con la tua)
+        // Configurazione Firebase (inserita da te)
         const firebaseConfig = {
           apiKey: "AIzaSyAYgvLPFt9ZtfvnnwSebotXMbazOb-BcUs",
           authDomain: "presenze-pratiche-incampo-vet.firebaseapp.com",
@@ -266,8 +266,13 @@
             let presentCount = 0;
             
             // Aggiorna i campi metadata nell'header
-            subjectInput.value = currentOutingData.subject || '';
-            outingTypeInput.value = currentOutingData.outingType || '';
+            // Controlla che il focus non sia su questi campi prima di aggiornare
+            if (document.activeElement !== subjectInput) {
+                subjectInput.value = currentOutingData.subject || '';
+            }
+            if (document.activeElement !== outingTypeInput) {
+                outingTypeInput.value = currentOutingData.outingType || '';
+            }
 
             // Itera su tutti gli elementi studente *già presenti* nel DOM
             const studentItems = studentGridContainer.querySelectorAll('.student-item');
@@ -282,6 +287,12 @@
                 item.classList.toggle('line-through', isPresent);
                 item.classList.toggle('opacity-75', isPresent);
                 item.classList.toggle('bg-gray-50', isPresent);
+                item.classList.toggle('border-gray-200', isPresent);
+
+                // Stili per "assente" (default)
+                item.classList.toggle('text-gray-900', !isPresent);
+                item.classList.toggle('bg-white', !isPresent);
+                item.classList.toggle('border-gray-300', !isPresent);
 
                 if (isPresent) {
                     presentCount++;
@@ -497,8 +508,11 @@
         });
 
 
-        // Pulsante ESPORTA
-        exportButton.addEventListener('click', () => {
+        /**
+         * (MODIFICA) Pulsante ESPORTA / CONDIVIDI
+         * Usa l'API Web Share se disponibile, altrimenti usa il modale.
+         */
+        exportButton.addEventListener('click', async () => {
             const attendance = currentOutingData.attendance || {};
             
             let presenti = [];
@@ -515,10 +529,13 @@
 
             // Costruisce il testo
             const date = dateInput.value || 'Data non specificata';
+            const subject = subjectInput.value || 'Non specificato';
+            const outingType = outingTypeInput.value || 'Non specificata';
+            
             let output = `--- REPORT PRESENZE ---\n`;
             output += `Data: ${date}\n`;
-            output += `Insegnamento: ${subjectInput.value || 'Non specificato'}\n`;
-            output += `Tipo Uscita: ${outingTypeInput.value || 'Non specificata'}\n`;
+            output += `Insegnamento: ${subject}\n`;
+            output += `Tipo Uscita: ${outingType}\n`;
             output += `--------------------------\n\n`;
             
             output += `PRESENTI (${presenti.length}):\n`;
@@ -526,22 +543,49 @@
             output += `\nASSENTI (${assenti.length}):\n`;
             output += assenti.length > 0 ? assenti.join('\n') : '(Nessuno)\n';
             
-            exportTextArea.value = output;
-            modalTitle.textContent = 'Esporta Lista Presenze';
-            exportContent.classList.remove('hidden');
-            resetContent.classList.add('hidden');
-            modal.showModal();
+            
+            // Prova a usare l'API di condivisione nativa
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: `Report Presenze - ${date}`,
+                        text: output,
+                    });
+                    console.log('Report condiviso con successo.');
+                } catch (err) {
+                    console.error('Errore durante la condivisione:', err);
+                }
+            } else {
+                // Fallback per browser desktop (mostra il modale)
+                console.log('API Web Share non supportata, uso il modale.');
+                exportTextArea.value = output;
+                modalTitle.textContent = 'Esporta Lista Presenze';
+                exportContent.classList.remove('hidden');
+                resetContent.classList.add('hidden');
+                modal.showModal();
+            }
         });
 
-        // Pulsante COPIA TESTO (invariato)
+        // Pulsante COPIA TESTO (usato solo nel fallback)
         copyButton.addEventListener('click', () => {
             exportTextArea.select();
             try {
+                // document.execCommand è deprecato ma più affidabile in contesti non sicuri
                 document.execCommand('copy');
                 copyButton.textContent = 'Copiato!';
                 setTimeout(() => { copyButton.textContent = 'Copia Testo'; }, 2000);
             } catch (err) {
-                copyButton.textContent = 'Errore... Copia manualmente.';
+                // Fallback per navigator.clipboard (richiede HTTPS)
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(exportTextArea.value).then(() => {
+                        copyButton.textContent = 'Copiato!';
+                        setTimeout(() => { copyButton.textContent = 'Copia Testo'; }, 2000);
+                    }).catch(err => {
+                        copyButton.textContent = 'Errore... Copia manualmente.';
+                    });
+                } else {
+                    copyButton.textContent = 'Errore... Copia manualmente.';
+                }
             }
         });
         
@@ -579,9 +623,6 @@
         // --- Avvio Applicazione ---
         document.addEventListener('DOMContentLoaded', async () => {
             
-            // (FIX) Rimossa la "visualizzazione forzata" da qui.
-            // L'app ora attende l'autenticazione prima di disegnare.
-
             // 1. Aggiungi i listener per i metadata
             subjectInput.addEventListener('input', handleMetadataChange);
             outingTypeInput.addEventListener('input', handleMetadataChange);
@@ -602,7 +643,9 @@
                         
                         // (FIX) Logica di avvio spostata QUI
                         // 1. Imposta la data
-                        dateInput.value = getTodayDateString();
+                        if (!dateInput.value) {
+                           dateInput.value = getTodayDateString();
+                        }
                         // 2. Crea la griglia (ora qui, dopo auth)
                         createStudentGrid(); 
                         // 3. Avvia il listener
