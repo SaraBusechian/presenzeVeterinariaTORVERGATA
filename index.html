@@ -30,10 +30,7 @@
              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
         }
 
-        /* (FIX) Rimosso lo stile .present da qui
-           La direttiva '@apply' non funziona con il CDN di Tailwind.
-           Lo stile verrà applicato dinamicamente con JavaScript.
-        */
+        /* Il bug @apply è stato risolto applicando le classi via JS */
 
         /* Stile per il backdrop del modal (per accessibilità) */
         dialog::backdrop {
@@ -89,7 +86,6 @@
             <div class="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
                 <div>
                     <h1 class="text-3xl font-bold text-gray-800 mb-2">Registro Presenze</h1>
-                    <!-- MODIFICA: Nome corso aggiornato -->
                     <p class="text-gray-600">Corso di Laurea in Medicina Veterinaria - Tor Vergata</p>
                 </div>
                 <!-- Indicatore di Stato Connessione -->
@@ -282,7 +278,6 @@
                 const isPresent = attendance[id] === true;
                 
                 // (FIX) Applica o rimuovi le classi Tailwind direttamente
-                // Questo risolve il bug dello stile che non si applicava.
                 item.classList.toggle('text-gray-500', isPresent);
                 item.classList.toggle('line-through', isPresent);
                 item.classList.toggle('opacity-75', isPresent);
@@ -332,9 +327,11 @@
             
             // Mostra un caricamento temporaneo
             statusDot.classList.add('bg-yellow-400', 'animate-pulse');
-            statusDot.classList.remove('bg-green-500', 'bg-red-500');
+            statusDot.classList.remove('bg-green-500', 'bg-red-500', 'bg-gray-400');
             statusText.textContent = 'Caricamento...';
-
+            connectionStatus.classList.remove('bg-gray-100', 'text-gray-700');
+            connectionStatus.classList.add('bg-gray-100', 'text-gray-500'); // Grigio chiaro testo
+            
             currentOutingDocRef = doc(db, COLLECTION_NAME, docId);
 
             // onSnapshot si attiva la prima volta e poi ogni volta che i dati cambiano
@@ -389,11 +386,20 @@
         function handleDateChange() {
             const dateValue = dateInput.value; // Formato YYYY-MM-DD
             if (dateValue) {
+                // Se viene selezionata una data, avvia il listener
                 attachFirestoreListener(dateValue);
             } else {
-                // Se la data è vuota, resetta
+                // Se la data viene cancellata, resetta tutto
                 if (unsubscribeFirestore) unsubscribeFirestore();
                 updateVisuals({}); // Pulisce la UI
+                currentOutingDocRef = null;
+                
+                // Reimposta lo stato a "Pronto"
+                statusDot.classList.remove('bg-yellow-400', 'animate-pulse', 'bg-green-500', 'bg-red-500');
+                statusDot.classList.add('bg-gray-400');
+                statusText.textContent = 'Pronto';
+                connectionStatus.classList.remove('bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
+                connectionStatus.classList.add('bg-gray-100', 'text-gray-700');
             }
         }
 
@@ -410,7 +416,12 @@
             }
             // Se il documento non è pronto (data non inserita)
             if (!currentOutingDocRef) {
-                alert("Per favore, inserisci una data valida prima di segnare le presenze.");
+                // Aggiunge un feedback visivo
+                const dateLabel = document.querySelector('label[for="outingDate"]');
+                dateLabel.classList.add('text-red-600', 'font-bold');
+                setTimeout(() => {
+                    dateLabel.classList.remove('text-red-600', 'font-bold');
+                }, 1500);
                 return;
             }
             
@@ -450,7 +461,17 @@
             clearTimeout(metadataSaveTimer);
             
             // Se il documento non è pronto, non fare nulla
-            if (!currentOutingDocRef) return;
+            if (!currentOutingDocRef) {
+                // Aggiunge un feedback visivo se si prova a scrivere senza data
+                if(subjectInput.value.trim() || outingTypeInput.value.trim()) {
+                    const dateLabel = document.querySelector('label[for="outingDate"]');
+                    dateLabel.classList.add('text-red-600', 'font-bold');
+                    setTimeout(() => {
+                        dateLabel.classList.remove('text-red-600', 'font-bold');
+                    }, 1500);
+                }
+                return;
+            }
             
             // Imposta un nuovo timer
             metadataSaveTimer = setTimeout(async () => {
@@ -477,6 +498,14 @@
 
         // Pulsante AZZERA
         resetButton.addEventListener('click', () => {
+            if (!currentOutingDocRef) {
+                const dateLabel = document.querySelector('label[for="outingDate"]');
+                dateLabel.classList.add('text-red-600', 'font-bold');
+                setTimeout(() => {
+                    dateLabel.classList.remove('text-red-600', 'font-bold');
+                }, 1500);
+                return;
+            }
             modalTitle.textContent = 'Azzera Presenze';
             exportContent.classList.add('hidden');
             resetContent.classList.remove('hidden');
@@ -513,6 +542,15 @@
          * Usa l'API Web Share se disponibile, altrimenti usa il modale.
          */
         exportButton.addEventListener('click', async () => {
+            if (!currentOutingDocRef) {
+                const dateLabel = document.querySelector('label[for="outingDate"]');
+                dateLabel.classList.add('text-red-600', 'font-bold');
+                setTimeout(() => {
+                    dateLabel.classList.remove('text-red-600', 'font-bold');
+                }, 1500);
+                return;
+            }
+
             const attendance = currentOutingData.attendance || {};
             
             let presenti = [];
@@ -601,25 +639,18 @@
                 item.dataset.id = student.id; // Salva l'ID nell'elemento
                 item.className = 'student-item'; // Stile base
                 
+                // (FIX) Applica lo stile "assente" di default
+                item.classList.add('text-gray-900', 'bg-white', 'border-gray-300');
+                
                 // Aggiunge l'evento click per segnare/deselezionare
                 item.addEventListener('click', togglePresence);
                 
                 studentGridContainer.appendChild(item);
             });
+            // Aggiorna il contatore a 0
+            counter.textContent = `Presenti: 0 / ${students.length}`;
         }
         
-        /**
-         * Ottiene la data di oggi in formato YYYY-MM-DD
-         */
-        function getTodayDateString() {
-            const today = new Date();
-            const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0'); // Mesi da 0-11
-            const dd = String(today.getDate()).padStart(2, '0');
-            return `${yyyy}-${mm}-${dd}`;
-        }
-
-
         // --- Avvio Applicazione ---
         document.addEventListener('DOMContentLoaded', async () => {
             
@@ -639,17 +670,25 @@
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         // Utente già loggato (anonimo)
-                        console.log("Utente autenticato:", user.uid);
+                        console.log("Utente autenticato, app in attesa.");
                         
-                        // (FIX) Logica di avvio spostata QUI
-                        // 1. Imposta la data
-                        if (!dateInput.value) {
-                           dateInput.value = getTodayDateString();
-                        }
-                        // 2. Crea la griglia (ora qui, dopo auth)
+                        // (MODIFICA) AVVIO "VUOTO"
+                        // Imposta lo stato a "Pronto" (grigio)
+                        statusDot.classList.remove('bg-yellow-400', 'animate-pulse');
+                        statusDot.classList.add('bg-gray-400');
+                        statusText.textContent = 'Pronto';
+                        connectionStatus.classList.remove('bg-gray-100', 'text-gray-500');
+                        connectionStatus.classList.add('bg-gray-100', 'text-gray-700');
+                        
+                        // 1. Crea la griglia (ora qui, dopo auth)
                         createStudentGrid(); 
-                        // 3. Avvia il listener
-                        handleDateChange();
+                        
+                        // 2. Rimuove il caricamento
+                        loadingOverlay.style.opacity = '0';
+                        setTimeout(() => { loadingOverlay.style.display = 'none'; }, 300);
+                        
+                        // 3. L'app ora attende che l'utente cambi la data in handleDateChange()
+                        // (Nessuna chiamata automatica a handleDateChange() o set data)
 
                     } else {
                         // Utente non loggato, prova a fare login anonimo
