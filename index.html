@@ -30,8 +30,6 @@
              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
         }
 
-        /* Il bug @apply è stato risolto applicando le classi via JS */
-
         /* Stile per il backdrop del modal (per accessibilità) */
         dialog::backdrop {
             background: rgba(0, 0, 0, 0.5);
@@ -68,6 +66,13 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
+        }
+
+        /* Stile per il PIN input */
+        #pinInput {
+            font-size: 2rem;
+            letter-spacing: 0.5em;
+            text-align: center;
         }
 
     </style>
@@ -119,7 +124,7 @@
             
             <!-- Contatore -->
             <div id="counter" class="text-lg font-semibold my-4 text-center text-gray-700">
-                Presenti: 0 / 16
+                Presenti: 0 / 78
             </div>
 
             <!-- Pulsanti di Azione -->
@@ -165,6 +170,38 @@
             <button id="closeModalButton" class="bg-gray-200 text-gray-800 py-2 px-5 rounded-lg hover:bg-gray-300">Chiudi</button>
         </footer>
     </dialog>
+    
+    <!-- (NOVITÀ) Modale per Inserimento PIN Matricola -->
+    <dialog id="pinModal" class="p-0 rounded-lg shadow-xl max-w-sm w-11/12">
+        <form method="dialog" id="pinForm">
+            <div class="p-6">
+                <h3 id="pinModalTitle" class="text-xl font-bold mb-2 text-center">Conferma Presenza</h3>
+                <p id="pinStudentName" class="text-center text-gray-700 text-lg mb-4"></p>
+                <label for="pinInput" class="block text-sm font-medium text-gray-700 text-center">Inserisci le **ultime 4 cifre** della tua matricola:</label>
+                <input 
+                    type="tel" 
+                    id="pinInput" 
+                    class="mt-2 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                    maxlength="4" 
+                    pattern="\d{4}" 
+                    inputmode="numeric" 
+                    autocomplete="off"
+                    required
+                >
+                <p id="pinError" class="text-red-600 text-sm text-center h-4 mt-2"></p>
+            </div>
+            
+            <!-- Pulsanti di Azione Modale PIN -->
+            <footer class="bg-gray-100 p-4 flex gap-3">
+                <button id="pinCancelButton" type="button" class="w-1/2 bg-gray-200 text-gray-800 py-2 px-5 rounded-lg hover:bg-gray-300">
+                    Annulla
+                </button>
+                <button id="pinConfirmButton" type="submit" class="w-1/2 bg-green-600 text-white py-2 px-5 rounded-lg hover:bg-green-700">
+                    Conferma
+                </button>
+            </footer>
+        </form>
+    </dialog>
 
 
     <!-- Script per Firebase -->
@@ -176,25 +213,87 @@
 
         // --- CONFIGURAZIONE ---
         
-        // Questa è la lista fittizia. Sostituiscila con quella reale.
-        // Assicurati che ogni studente abbia un 'id' unico (es. 's1', 's2', ... o meglio ancora la matricola).
+        // (MODIFICA) Lista studenti aggiornata con i dati reali (78 studenti)
+        // L'ID è la MATRICOLA (come stringa, per preservare gli '0' iniziali)
         const students = [
-            { id: 's1', name: 'Mario Rossi' },
-            { id: 's2', name: 'Laura Bianchi' },
-            { id: 's3', name: 'Giuseppe Verdi' },
-            { id: 's4', name: 'Anna Neri' },
-            { id: 's5', name: 'Luca Gialli' },
-            { id: 's6', name: 'Chiara Bruno' },
-            { id: 's7', name: 'Paolo Russo' },
-            { id: 's8', name: 'Sara Ferrari' },
-            { id: 's9', name: 'Matteo Romano' },
-            { id: 's10', name: 'Elena Greco' },
-            { id: 's11', name: 'Davide Galli' },
-            { id: 's12', name: 'Sofia Conti' },
-            { id: 's13', name: 'Lorenzo Serra' },
-            { id: 's14', name: 'Giulia Esposito' },
-            { id: 's15', name: 'Andrea Moretti' },
-            { id: 's16', name: 'Francesca Barbieri' }
+            { id: '0361081', name: 'ABBATE MARIANGELA' },
+            { id: '0357899', name: 'ACCHIONE MARIA' },
+            { id: '0364914', name: 'ALBERTI VALENTINA' },
+            { id: '0358281', name: 'AMBRIFI NIVES' },
+            { id: '0357796', name: 'APONE JACOPO ARES' },
+            { id: '0364953', name: 'ARNONE MARCELLA' },
+            { id: '0358185', name: 'BARDELLI VALENTINA' },
+            { id: '0345650', name: 'BARNI GIORDANO' },
+            { id: '0360330', name: 'BARTOCCINI BENEDETTA' },
+            { id: '0363927', name: 'BIRELLO ARIANNA' },
+            { id: '0361033', name: 'BUCCHI FEDERICA' },
+            { id: '0364891', name: 'CAMEO LORENZO' },
+            { id: '0357819', name: 'CAPPARONI ALESSANDRO' },
+            { id: '0364965', name: 'CAPREDONI GIULIA' },
+            { id: '0357942', name: 'CARIA PRISCO' },
+            { id: '0357820', name: 'CASSONI ELISA' },
+            { id: '0357954', name: 'CASTELLITTO MADDALENA' },
+            { id: '0359889', name: 'CATENA FEDERICA' },
+            { id: '0357974', name: 'CELLI VIRGINIA' },
+            { id: '0364083', name: 'CERRA MONICA' },
+            { id: '0308693', name: 'CIFERRI CHIARA' },
+            { id: '0366267', name: 'CIOFFI ALESSANDRA' },
+            { id: '0357874', name: 'CIRILLO ALESSANDRA' },
+            { id: '0363997', name: 'CONTE MARIAELENA' },
+            { id: '0359922', name: 'CONTI TOMMASO' },
+            { id: '0357840', name: 'COPPA MARTINA' },
+            { id: '0362386', name: 'COSENTINO MARIANNA' },
+            { id: '0358121', name: 'DAMIAN ELEONORA MARIA' },
+            { id: '0359906', name: 'DE BARI MARIA ELISA' },
+            { id: '0359862', name: 'DE DOMINICIS FEDERICA' },
+            { id: '0357976', name: 'DELLE FRATTE VALENTINA' },
+            { id: '0342153', name: 'DENTAMARO MAURO' },
+            { id: '0358250', name: 'DI MANNO CAROLINA' },
+            { id: '0342687', name: 'D\'OTTAVI ELEONORA' },
+            { id: '0364557', name: 'FABBO LUCREZIA' },
+            { id: '0363906', name: 'FALCONE ROSALIA' },
+            { id: '0357836', name: 'FIAMMENGO ALICE' },
+            { id: '0361370', name: 'FORCINITI GIOVANNA ANGELA' },
+            { id: '0358325', name: 'GASPARINI CHIARA' },
+            { id: '0361482', name: 'GIAMBELLUCA DILETTA' },
+            { id: '0360070', name: 'IANNOTTA LIVIA' },
+            { id: '0365377', name: 'INGA VANESSA' },
+            { id: '0358091', name: 'LACELLI ARIANNA BARBARA' },
+            { id: '0359734', name: 'LODOLI LUDOVICO' },
+            { id: '0357806', name: 'LOSCO VALENTINA' },
+            { id: '0359884', name: 'LUDOVISI CRISTINA' },
+            { id: '0362347', name: 'MAGRINI ELOISA' },
+            { id: '0358465', name: 'MARTINELLI DANIELE' },
+            { id: '0357835', name: 'MARTUCCI MARCO' },
+            { id: '0363376', name: 'MATTEUCCI CHIARA' },
+            { id: '0359938', name: 'MEDERI GIULIA' },
+            { id: '0358073', name: 'MOCHI EMANUELE' },
+            { id: '0358169', name: 'MODESTI GRETA' },
+            { id: '0358022', name: 'MOZZETTI EMANUELE' },
+            { id: '0359932', name: 'NERI ALESSIA' },
+            { id: '0358050', name: 'NESE ALICE' },
+            { id: '0357894', name: 'PACELLI SOFIA' },
+            { id: '0357805', name: 'PADOVANI BENEDETTA' },
+            { id: '0357776', name: 'PALAZZI ALESSIA' },
+            { id: '0364410', name: 'PALLANTE NICOLE' },
+            { id: '0360667', name: 'PESAVENTO BEATRIZ' },
+            { id: '0358051', name: 'PINCO CHIARA' },
+            { id: '0359875', name: 'PIZZICANNELLA GIULIA' },
+            { id: '0361405', name: 'PIZZOLITTO MARTINA' },
+            { id: '0357914', name: 'PRILI ELEONORA' },
+            { id: '0359776', name: 'RAGNI ILARIA' },
+            { id: '0357882', name: 'RINALDI LORENZO' },
+            { id: '0357846', name: 'RUFINI BENEDETTA' },
+            { id: '0362402', name: 'RUSCELLONI BEATRICE' },
+            { id: '0359924', name: 'SABINO NOEMI' },
+            { id: '0358034', name: 'SALVATORI GEMMA' },
+            { id: '0358201', name: 'SARGENTI SARA' },
+            { id: '0312852', name: 'SCORZA ADELE PIA' },
+            { id: '0358331', name: 'STROSCIA CHIARA' },
+            { id: '0358142', name: 'TOLOMEI FRANCESCO' },
+            { id: '0360218', name: 'VIANELLO VITTORIA' },
+            { id: '0358302', name: 'VINCI ALICE' },
+            { id: '0358146', name: 'ZAMPARINI LORENZO' }
         ];
 
         // --- CONFIGURAZIONE FIREBASE ---
@@ -220,7 +319,8 @@
         let unsubscribeFirestore; // Funzione per staccare il listener
         let isUpdating = false; // Flag per prevenire doppi clic
         let metadataSaveTimer; // Timer per salvare i metadata
-
+        let currentStudentId = null; // (NOVITÀ) ID dello studente che sta inserendo il PIN
+        const studentMap = new Map(students.map(s => [s.id, s.name])); // Mappa per lookup veloci
 
         // --- Elementi del DOM ---
         const studentGridContainer = document.getElementById('studentGridContainer');
@@ -238,7 +338,7 @@
         const outingTypeInput = document.getElementById('outingType');
         const loadingOverlay = document.getElementById('loadingOverlay');
         
-        // Modale
+        // Modale (vecchio)
         const modal = document.getElementById('modal');
         const modalTitle = document.getElementById('modalTitle');
         const exportContent = document.getElementById('exportContent');
@@ -247,12 +347,22 @@
         const resetContent = document.getElementById('resetContent');
         const confirmResetButton = document.getElementById('confirmResetButton');
         const closeModalButton = document.getElementById('closeModalButton');
+        
+        // (NOVITÀ) Modale PIN
+        const pinModal = document.getElementById('pinModal');
+        const pinForm = document.getElementById('pinForm');
+        const pinModalTitle = document.getElementById('pinModalTitle');
+        const pinStudentName = document.getElementById('pinStudentName');
+        const pinInput = document.getElementById('pinInput');
+        const pinError = document.getElementById('pinError');
+        const pinConfirmButton = document.getElementById('pinConfirmButton');
+        const pinCancelButton = document.getElementById('pinCancelButton');
 
 
         // --- Funzioni Principali ---
 
         /**
-         * (FIX) Aggiorna solo gli stili (presente/assente) degli elementi
+         * Aggiorna solo gli stili (presente/assente) degli elementi
          * e il contatore, senza ricreare il DOM.
          */
         function updateVisuals(data = {}) {
@@ -262,7 +372,6 @@
             let presentCount = 0;
             
             // Aggiorna i campi metadata nell'header
-            // Controlla che il focus non sia su questi campi prima di aggiornare
             if (document.activeElement !== subjectInput) {
                 subjectInput.value = currentOutingData.subject || '';
             }
@@ -277,7 +386,7 @@
                 const id = item.dataset.id;
                 const isPresent = attendance[id] === true;
                 
-                // (FIX) Applica o rimuovi le classi Tailwind direttamente
+                // Applica o rimuovi le classi Tailwind direttamente
                 item.classList.toggle('text-gray-500', isPresent);
                 item.classList.toggle('line-through', isPresent);
                 item.classList.toggle('opacity-75', isPresent);
@@ -299,7 +408,7 @@
         }
         
         /**
-         * (FIX) Filtra la lista (mostra/nasconde) in base alla ricerca.
+         * Filtra la lista (mostra/nasconde) in base alla ricerca.
          * Non ricrea il DOM.
          */
         function filterList() {
@@ -342,7 +451,7 @@
                 connectionStatus.classList.remove('bg-gray-100', 'text-gray-500');
                 connectionStatus.classList.add('bg-green-100', 'text-green-700');
                 
-                isUpdating = false; // Sblocca i clic
+                isUpdating = false; // Sblocca i clic (per il PIN)
 
                 if (docSnap.exists()) {
                     // Documento trovato, aggiorna la UI
@@ -360,10 +469,8 @@
                     
                     setDoc(currentOutingDocRef, initialData);
                     // 'onSnapshot' si attiverà di nuovo automaticamente dopo setDoc,
-                    // quindi non c'è bisogno di chiamare updateVisuals(initialData) qui.
                 }
                 
-                // Nasconde l'overlay solo dopo il primo caricamento
                 loadingOverlay.style.opacity = '0';
                 setTimeout(() => { loadingOverlay.style.display = 'none'; }, 300);
 
@@ -404,19 +511,13 @@
         }
 
         /**
-         * Gestore evento per il click sul nome dello studente.
-         * Invia l'aggiornamento a Firestore.
+         * (MODIFICA) Gestore evento per il click sul nome.
+         * Ora apre il modale del PIN invece di salvare direttamente.
          * @param {Event} event 
          */
-        async function togglePresence(event) {
-            // Se stiamo già salvando un clic, ignora i clic successivi
-            if (isUpdating) {
-                console.log("Salvataggio in corso, attendere...");
-                return;
-            }
-            // Se il documento non è pronto (data non inserita)
+        function handleStudentClick(event) {
+            // Se il documento non è pronto (data non inserita), avvisa
             if (!currentOutingDocRef) {
-                // Aggiunge un feedback visivo
                 const dateLabel = document.querySelector('label[for="outingDate"]');
                 dateLabel.classList.add('text-red-600', 'font-bold');
                 setTimeout(() => {
@@ -424,37 +525,91 @@
                 }, 1500);
                 return;
             }
-            
-            isUpdating = true; // Imposta il blocco
 
             const item = event.currentTarget;
-            const id = item.dataset.id;
-            
-            // Leggiamo lo stato attuale dalla variabile globale
-            const attendance = currentOutingData.attendance || {};
-            const isCurrentlyPresent = attendance[id] === true;
-            const newPresence = !isCurrentlyPresent;
+            currentStudentId = item.dataset.id; // Salva l'ID per il gestore del PIN
+            const studentName = item.textContent;
 
-            try {
-                // Usa updateDoc con la "dot notation"
-                const fieldToUpdate = `attendance.${id}`;
+            // Controlla lo stato attuale
+            const attendance = currentOutingData.attendance || {};
+            const isCurrentlyPresent = attendance[currentStudentId] === true;
+
+            // Pulisci il modale precedente
+            pinInput.value = '';
+            pinError.textContent = '';
+            pinInput.focus();
+
+            // Configura e apri il modale
+            pinModalTitle.textContent = isCurrentlyPresent ? 'Annulla Presenza' : 'Conferma Presenza';
+            pinStudentName.textContent = studentName;
+            pinModal.showModal();
+            pinInput.focus(); // Focus sull'input
+        }
+        
+        /**
+         * (NOVITÀ) Gestore per la conferma del PIN
+         */
+        async function handlePinConfirm() {
+            // Se stiamo già salvando un clic, ignora
+            if (isUpdating) {
+                console.log("Salvataggio in corso, attendere...");
+                return;
+            }
+
+            const pin = pinInput.value;
+            if (pin.length < 4) {
+                pinError.textContent = "Inserisci 4 cifre.";
+                return;
+            }
+
+            // Trova la matricola reale
+            const student = students.find(s => s.id === currentStudentId);
+            if (!student) {
+                pinError.textContent = "Errore: Studente non trovato.";
+                return;
+            }
+
+            const correctPin = student.id.slice(-4); // Ultime 4 cifre della matricola
+
+            if (pin === correctPin) {
+                // PIN CORRETTO
+                isUpdating = true; // Imposta il blocco
+                pinError.textContent = '';
                 
-                // Aggiorna solo quel campo
-                await updateDoc(currentOutingDocRef, {
-                    [fieldToUpdate]: newPresence
-                });
-                // 'onSnapshot' riceverà l'aggiornamento e chiamerà updateVisuals,
-                // sbloccando anche 'isUpdating = false'.
+                // Calcola il nuovo stato
+                const attendance = currentOutingData.attendance || {};
+                const isCurrentlyPresent = attendance[currentStudentId] === true;
+                const newPresence = !isCurrentlyPresent;
+
+                try {
+                    // Aggiorna il database
+                    const fieldToUpdate = `attendance.${currentStudentId}`;
+                    await updateDoc(currentOutingDocRef, {
+                        [fieldToUpdate]: newPresence
+                    });
+                    
+                    // onSnapshot si occuperà di aggiornare la UI
+                    // e reimpostare isUpdating = false.
+                    
+                } catch (e) {
+                    console.error("Errore nell'aggiornamento della presenza:", e);
+                    pinError.textContent = "Errore di salvataggio. Riprova.";
+                    isUpdating = false; // Sblocca in caso di errore
+                }
                 
-            } catch (e) {
-                console.error("Errore nell'aggiornamento della presenza:", e);
-                isUpdating = false; // Sblocca in caso di errore
+                pinModal.close(); // Chiudi il modale
+
+            } else {
+                // PIN ERRATO
+                pinError.textContent = "PIN non corretto. Riprova.";
+                pinInput.value = ''; // Pulisci
+                pinInput.focus();
             }
         }
 
+
         /**
          * Salva i metadata (Insegnamento, Tipo) dopo un breve ritardo
-         * per evitare scritture multiple (debouncing).
          */
         function handleMetadataChange() {
             // Cancella il timer precedente
@@ -462,7 +617,6 @@
             
             // Se il documento non è pronto, non fare nulla
             if (!currentOutingDocRef) {
-                // Aggiunge un feedback visivo se si prova a scrivere senza data
                 if(subjectInput.value.trim() || outingTypeInput.value.trim()) {
                     const dateLabel = document.querySelector('label[for="outingDate"]');
                     dateLabel.classList.add('text-red-600', 'font-bold');
@@ -493,8 +647,18 @@
         // Filtra la lista mentre l'utente digita
         searchBar.addEventListener('input', filterList);
 
-        // Chiude il modale
+        // Chiude il modale (vecchio)
         closeModalButton.addEventListener('click', () => modal.close());
+        
+        // (NOVITÀ) Gestori Modale PIN
+        pinCancelButton.addEventListener('click', () => {
+            pinModal.close();
+        });
+        
+        pinForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // Impedisce il submit standard del form
+            handlePinConfirm();
+        });
 
         // Pulsante AZZERA
         resetButton.addEventListener('click', () => {
@@ -538,8 +702,7 @@
 
 
         /**
-         * (MODIFICA) Pulsante ESPORTA / CONDIVIDI
-         * Usa l'API Web Share se disponibile, altrimenti usa il modale.
+         * Pulsante ESPORTA / CONDIVIDI
          */
         exportButton.addEventListener('click', async () => {
             if (!currentOutingDocRef) {
@@ -607,13 +770,12 @@
         // Pulsante COPIA TESTO (usato solo nel fallback)
         copyButton.addEventListener('click', () => {
             exportTextArea.select();
+            // ... (logica di copia invariata)
             try {
-                // document.execCommand è deprecato ma più affidabile in contesti non sicuri
                 document.execCommand('copy');
                 copyButton.textContent = 'Copiato!';
                 setTimeout(() => { copyButton.textContent = 'Copia Testo'; }, 2000);
             } catch (err) {
-                // Fallback per navigator.clipboard (richiede HTTPS)
                 if (navigator.clipboard) {
                     navigator.clipboard.writeText(exportTextArea.value).then(() => {
                         copyButton.textContent = 'Copiato!';
@@ -628,7 +790,7 @@
         });
         
         /**
-         * (FIX) Funzione che crea la griglia statica degli studenti
+         * Funzione che crea la griglia statica degli studenti
          * Viene chiamata UNA SOLA VOLTA.
          */
         function createStudentGrid() {
@@ -636,18 +798,18 @@
             students.forEach(student => {
                 const item = document.createElement('div');
                 item.textContent = student.name;
-                item.dataset.id = student.id; // Salva l'ID nell'elemento
+                item.dataset.id = student.id; // Salva l'ID (matricola)
                 item.className = 'student-item'; // Stile base
                 
-                // (FIX) Applica lo stile "assente" di default
+                // Applica lo stile "assente" di default
                 item.classList.add('text-gray-900', 'bg-white', 'border-gray-300');
                 
-                // Aggiunge l'evento click per segnare/deselezionare
-                item.addEventListener('click', togglePresence);
+                // (MODIFICA) Il clic ora apre il modale del PIN
+                item.addEventListener('click', handleStudentClick);
                 
                 studentGridContainer.appendChild(item);
             });
-            // Aggiorna il contatore a 0
+            // Aggiorna il contatore (basato sulla lista appena caricata)
             counter.textContent = `Presenti: 0 / ${students.length}`;
         }
         
@@ -672,38 +834,34 @@
                         // Utente già loggato (anonimo)
                         console.log("Utente autenticato, app in attesa.");
                         
-                        // (MODIFICA) AVVIO "VUOTO"
-                        // Imposta lo stato a "Pronto" (grigio)
+                        // AVVIO "VUOTO"
                         statusDot.classList.remove('bg-yellow-400', 'animate-pulse');
                         statusDot.classList.add('bg-gray-400');
                         statusText.textContent = 'Pronto';
                         connectionStatus.classList.remove('bg-gray-100', 'text-gray-500');
                         connectionStatus.classList.add('bg-gray-100', 'text-gray-700');
                         
-                        // 1. Crea la griglia (ora qui, dopo auth)
+                        // 1. Crea la griglia
                         createStudentGrid(); 
                         
                         // 2. Rimuove il caricamento
                         loadingOverlay.style.opacity = '0';
                         setTimeout(() => { loadingOverlay.style.display = 'none'; }, 300);
                         
-                        // 3. L'app ora attende che l'utente cambi la data in handleDateChange()
-                        // (Nessuna chiamata automatica a handleDateChange() o set data)
+                        // 3. L'app ora attende che l'utente cambi la data
 
                     } else {
                         // Utente non loggato, prova a fare login anonimo
                         try {
                             await signInAnonymously(auth);
                             console.log("Autenticazione anonima riuscita.");
-                            // onAuthStateChanged si attiverà di nuovo,
-                            // questa volta entrando nel blocco "if (user)"
+                            // onAuthStateChanged si attiverà di nuovo
                         } catch (e) {
                              console.error("Errore signInAnonymously:", e);
                              statusText.textContent = 'Errore Auth';
                              statusDot.classList.add('bg-red-500');
                              statusDot.classList.remove('animate-pulse');
                              
-                             // Gestione errore 'auth/configuration-not-found'
                              if (e.code === 'auth/configuration-not-found') {
                                 statusText.textContent = "Errore Auth: Abilita 'Accesso anonimo' in Firebase.";
                                 alert("ERRORE: L'accesso anonimo non è abilitato.\n\nVai sulla tua Console Firebase -> Authentication -> Sign-in method e abilita 'Anonimo'.");
